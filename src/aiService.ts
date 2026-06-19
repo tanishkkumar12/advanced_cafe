@@ -87,8 +87,8 @@ export class AIService {
       console.error("AI Service Error:", error);
       let msg = "It looks like I'm having trouble connecting to my brain right now. 🧠 Just a moment, perhaps try again?";
       
-      if (error.message.includes("OPENROUTER_API_KEY")) {
-        msg = "The OpenRouter API key seems to be missing. Please add it to the Secrets panel to activate my thinking!";
+      if (error.message.includes("GEMINI_API_KEY")) {
+        msg = "The Gemini API key seems to be missing. Please add it to the Secrets panel to activate my thinking!";
       } else if (error.message.includes("429") || error.message.includes("Rate limit")) {
         msg = "I've been talking a bit too much and reached a limit (Error 429). Could you wait a few seconds and try again?";
       } else if (error.message.includes("Provider error")) {

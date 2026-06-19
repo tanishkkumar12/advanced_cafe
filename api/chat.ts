@@ -1,8 +1,17 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 export const config = {
   runtime: "edge",
 };
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      "User-Agent": "aistudio-build",
+    },
+  },
+});
 
 export default async function handler(req: Request) {
   if (req.method !== "POST") {
@@ -15,37 +24,34 @@ export default async function handler(req: Request) {
   try {
     const { message, history, systemInstruction } = await req.json();
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
+    if (!process.env.GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "OPENROUTER_API_KEY is not configured in Vercel." }),
+        JSON.stringify({ error: "GEMINI_API_KEY is not configured in Vercel." }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const host = req.headers.get("host") || "vercel.com";
-    const protocol = host.includes("localhost") ? "http" : "https";
-    const referer = process.env.APP_URL || `${protocol}://${host}`;
-
-    const openai = new OpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: apiKey,
-      defaultHeaders: {
-        "HTTP-Referer": referer,
-        "X-Title": "RestoHost AI",
-      },
+    const contents = [];
+    if (history && Array.isArray(history)) {
+      for (const msg of history) {
+        contents.push({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.content || "" }]
+        });
+      }
+    }
+    contents.push({
+      role: "user",
+      parts: [{ text: message }]
     });
 
-    const response = await openai.chat.completions.create({
-      model: "openrouter/free", 
-      messages: [
-        { role: "system", content: systemInstruction },
-        ...(history || []),
-        { role: "user", content: message },
-      ],
-      stream: true,
-      max_tokens: 2048,
-      temperature: 0.7,
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3.5-flash",
+      contents,
+      config: {
+        systemInstruction,
+        temperature: 0.7,
+      }
     });
 
     const stream = new ReadableStream({
@@ -60,8 +66,8 @@ export default async function handler(req: Request) {
         }, 10000);
 
         try {
-          for await (const chunk of response) {
-            const content = chunk.choices[0]?.delta?.content || "";
+          for await (const chunk of responseStream) {
+            const content = chunk.text || "";
             
             if (content) {
               const data = JSON.stringify({ text: content });
@@ -90,7 +96,7 @@ export default async function handler(req: Request) {
       },
     });
   } catch (error: any) {
-    console.error("OpenRouter API Error:", error);
+    console.error("Gemini API Error:", error);
     return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

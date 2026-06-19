@@ -1,10 +1,19 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      "User-Agent": "aistudio-build",
+    },
+  },
+});
 
 async function startServer() {
   const app = express();
@@ -16,35 +25,33 @@ async function startServer() {
   app.post("/api/chat", async (req, res) => {
     const { message, history, systemInstruction } = req.body;
 
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.error("OPENROUTER_API_KEY is missing");
-      return res.status(500).json({ error: "OPENROUTER_API_KEY is not configured in the Secrets panel." });
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY is missing");
+      return res.status(500).json({ error: "GEMINI_API_KEY is not configured. Please add it to the Secrets panel in key settings to activate my thinking!" });
     }
 
-    const host = req.headers.host || "localhost:3000";
-    const protocol = req.protocol || (host.includes("localhost") ? "http" : "https");
-    const referer = process.env.APP_URL || `${protocol}://${host}`;
-
-    const openai = new OpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY,
-      defaultHeaders: {
-        "HTTP-Referer": referer,
-        "X-Title": "RestoHost AI",
-      }
-    });
-
     try {
-      const response = await openai.chat.completions.create({
-        model: "openrouter/free",
-        messages: [
-          { role: "system", content: systemInstruction },
-          ...(history || []),
-          { role: "user", content: message },
-        ],
-        stream: true,
-        max_tokens: 2048,
-        temperature: 0.7,
+      const contents = [];
+      if (history && Array.isArray(history)) {
+        for (const msg of history) {
+          contents.push({
+            role: msg.role === "user" ? "user" : "model",
+            parts: [{ text: msg.content || "" }]
+          });
+        }
+      }
+      contents.push({
+        role: "user",
+        parts: [{ text: message }]
+      });
+
+      const responseStream = await ai.models.generateContentStream({
+        model: "gemini-3.5-flash",
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
       });
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -61,8 +68,8 @@ async function startServer() {
       }, 10000);
 
       try {
-        for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || "";
+        for await (const chunk of responseStream) {
+          const content = chunk.text || "";
           
           if (content) {
             res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
@@ -76,7 +83,7 @@ async function startServer() {
         clearInterval(heartbeatInterval);
       }
     } catch (error: any) {
-      console.error("OpenRouter API Error:", error);
+      console.error("Gemini API Error:", error);
       const errorMessage = error.message || "Failed to fetch response from AI";
       if (!res.headersSent) {
         res.status(500).json({ error: errorMessage });

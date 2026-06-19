@@ -18,6 +18,27 @@ export interface OpeningHours {
   isClosed: boolean;
 }
 
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: string;
+  quantity: number;
+}
+
+export type OrderStatus = "Received" | "Preparing" | "Ready to Serve" | "Completed" | "Cancelled";
+
+export interface Order {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  tableNumber: string;
+  items: OrderItem[];
+  totalPrice: string;
+  status: OrderStatus;
+  createdAt: string;
+  notes?: string;
+}
+
 export interface RestaurantConfig {
   agentName: string;
   restaurantName: string;

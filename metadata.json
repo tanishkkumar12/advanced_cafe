@@ -1,6 +1,8 @@
 {
   "name": "RestoHost AI",
-  "description": "A customizable AI virtual host for restaurants and cafes. Configure your menu, hours, and business details to create a 24/7 digital concierge for your guests.",
+  "description": "A customizable AI virtual host for restaurants. Includes an interactive digital menu, contactless table-ordering checkout, real-time kitchen tracking, and business configurators.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
